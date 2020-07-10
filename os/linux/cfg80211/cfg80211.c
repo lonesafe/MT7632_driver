@@ -262,6 +262,11 @@ Note:
 	For iw utility: set type, set monitor
 ========================================================================
 */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,12,0))
+static int CFG80211_OpsVirtualInfChg(struct wiphy *pWiphy,
+	struct net_device *pNetDevIn, enum nl80211_iftype Type,
+	struct vif_params *pParams)
+#else
 static int CFG80211_OpsVirtualInfChg(struct wiphy *pWiphy,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32)
 				     struct net_device *pNetDevIn,
@@ -270,12 +275,16 @@ static int CFG80211_OpsVirtualInfChg(struct wiphy *pWiphy,
 #endif				/* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32) */
 				     enum nl80211_iftype Type,
 				     u32 *pFlags, struct vif_params *pParams)
+#endif
 {
 	VOID *pAd;
 	CFG80211_CB *pCfg80211_CB;
 	struct net_device *pNetDev;
 	CMD_RTPRIV_IOCTL_80211_VIF_PARM VifInfo;
 	UINT oldType = pNetDevIn->ieee80211_ptr->iftype;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,12,0))
+	u32 *pFlags;
+#endif /* LINUX_VERSION_CODE */
 
 	CFG80211DBG(RT_DEBUG_TRACE, ("80211> %s ==>\n", __func__));
 	CFG80211DBG(RT_DEBUG_TRACE, ("80211> IfTypeChange %d ==> %d\n", oldType, Type));
@@ -318,7 +327,12 @@ static int CFG80211_OpsVirtualInfChg(struct wiphy *pWiphy,
 	VifInfo.newIfType = Type;
 	VifInfo.oldIfType = oldType;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,12,0))
+	if (pParams != NULL) {
+		pFlags = & (pParams->flags);
+#else
 	if (pFlags != NULL) {
+#endif /* LINUX_VERSION_CODE */
 		VifInfo.MonFilterFlag = 0;
 
 		if (((*pFlags) & NL80211_MNTR_FLAG_FCSFAIL) == NL80211_MNTR_FLAG_FCSFAIL)
@@ -2406,6 +2420,10 @@ static int CFG80211_OpsChangeBss(struct wiphy *pWiphy,
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,19,0))
+static int mt76xx_cfg80211_del_sta(struct wiphy *wiphy, struct net_device *dev,
+			      struct station_del_parameters *params)
+#else
 static int mt76xx_cfg80211_del_sta(struct wiphy *wiphy, struct net_device *dev,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)
 				   const u8 *mac
@@ -2413,9 +2431,13 @@ static int mt76xx_cfg80211_del_sta(struct wiphy *wiphy, struct net_device *dev,
 				   u8 *mac
 #endif				/* endif */
 	)
+#endif
 {
 	RTMP_ADAPTER *pAd;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,19,0))
+	const u8 *mac = params->mac;
+#endif
 	MAC80211_PAD_GET(pAd, wiphy);
 
 	if (!pAd)
@@ -2495,11 +2517,18 @@ static int mt76xx_cfg80211_change_sta(struct wiphy *wiphy, struct net_device *de
 }
 
 #ifdef RT_CFG80211_P2P_CONCURRENT_DEVICE
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0))
-static struct wireless_dev *CFG80211_OpsVirtualInfAdd(IN struct wiphy *pWiphy,
-						      IN const char *name,
-						      IN enum nl80211_iftype Type,
-						      IN u32 *pFlags, struct vif_params *pParams)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,12,0))
+static struct wireless_dev* CFG80211_OpsVirtualInfAdd(struct wiphy *pWiphy,
+	const char *name, unsigned char name_assign_type, enum nl80211_iftype Type,
+	struct vif_params *pParams)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0))
+static struct wireless_dev* CFG80211_OpsVirtualInfAdd(struct wiphy *pWiphy,
+	const char *name, unsigned char name_assign_type, enum nl80211_iftype Type,
+	u32 *pFlags, struct vif_params *pParams)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0))
+struct wireless_dev * CFG80211_OpsVirtualInfAdd(struct wiphy *pWiphy,
+	const char *name, enum nl80211_iftype Type, u32 *pFlags,
+	struct vif_params *pParams)
 #else
 static struct net_device *CFG80211_OpsVirtualInfAdd(IN struct wiphy *pWiphy,
 						    IN char *name,

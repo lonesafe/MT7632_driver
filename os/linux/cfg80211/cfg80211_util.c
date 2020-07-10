@@ -990,6 +990,12 @@ Note:
 */
 VOID CFG80211OS_ScanEnd(IN VOID *pCB, IN BOOLEAN FlgIsAborted)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,8,0))
+           struct cfg80211_scan_info info = {
+               .aborted = FlgIsAborted
+           };
+#endif
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 30))
 #ifdef CONFIG_STA_SUPPORT
 	CFG80211_CB *pCfg80211_CB = (CFG80211_CB *) pCB;
@@ -997,7 +1003,11 @@ VOID CFG80211OS_ScanEnd(IN VOID *pCB, IN BOOLEAN FlgIsAborted)
 	NdisAcquireSpinLock(&pCfg80211_CB->scan_notify_lock);
 	if (pCfg80211_CB->pCfg80211_ScanReq) {
 		CFG80211DBG(RT_DEBUG_TRACE, ("80211> cfg80211_scan_done\n"));
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,8,0))
+		cfg80211_scan_done(pCfg80211_CB->pCfg80211_ScanReq, &info);
+#else
 		cfg80211_scan_done(pCfg80211_CB->pCfg80211_ScanReq, FlgIsAborted);
+#endif
 		pCfg80211_CB->pCfg80211_ScanReq = NULL;
 		pCfg80211_CB->ScanIsAborted = FlgIsAborted;
 	} else {
@@ -1212,11 +1222,22 @@ VOID CFG80211OS_MICFailReport(PNET_DEV pNetDev, const PUCHAR src_addr, BOOLEAN u
 VOID CFG80211OS_Roamed(PNET_DEV pNetDev, IN UCHAR *pBSSID,
 		       IN UCHAR *pReqIe, IN UINT32 ReqIeLen, IN UCHAR *pRspIe, IN UINT32 RspIeLen)
 {
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 12, 0))
+	struct cfg80211_roam_info roam_info = { .req_ie = pReqIe,
+						.req_ie_len = ReqIeLen,
+						.resp_ie = pRspIe,
+						.resp_ie_len = RspIeLen };
+	struct cfg80211_bss bss = {};
+	memcpy(bss.bssid, pBSSID, sizeof(bss.bssid));
+	roam_info.bss = &bss;
+	cfg80211_roamed(pNetDev, &roam_info, GFP_KERNEL);
+#else
 	cfg80211_roamed(pNetDev,
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39))
 			NULL,
 #endif /* endif */
 			pBSSID, pReqIe, ReqIeLen, pRspIe, RspIeLen, GFP_KERNEL);
+#endif
 }
 
 VOID CFG80211OS_RecvObssBeacon(VOID *pCB, const PUCHAR pFrame, INT frameLen, INT freq)
